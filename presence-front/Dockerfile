@@ -7,19 +7,21 @@ RUN npm run build
 
 FROM nginx:1.29-alpine
 
-# Mise à jour des paquets système + création de l'utilisateur non-root
 RUN apk upgrade --no-cache \
     && addgroup -S nonroot \
     && adduser -S nonroot -G nonroot \
     && rm -rf /usr/share/nginx/html/* \
-    # Donner les droits à nonroot sur les répertoires nécessaires à nginx
+    # Droits sur les répertoires utilisés par nginx
     && chown -R nonroot:nonroot /usr/share/nginx/html \
     && chown -R nonroot:nonroot /var/cache/nginx \
     && chown -R nonroot:nonroot /var/log/nginx \
+    && chown -R nonroot:nonroot /etc/nginx/conf.d \
     && touch /var/run/nginx.pid \
     && chown nonroot:nonroot /var/run/nginx.pid \
-    # Écoute sur un port non privilégié (port 80 réservé à root)
-    && sed -i 's/listen\s*80;/listen 8080;/g' /etc/nginx/conf.d/default.conf
+    # Port non privilégié
+    && sed -i 's/listen\s*80;/listen 8080;/g' /etc/nginx/conf.d/default.conf \
+    # Supprimer le warning "user directive"
+    && sed -i 's/^user\s\+nginx;/# user nginx;/' /etc/nginx/nginx.conf
 
 COPY --from=builder /app/dist /usr/share/nginx/html/
 
