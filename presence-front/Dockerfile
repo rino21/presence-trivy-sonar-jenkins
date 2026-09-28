@@ -1,21 +1,19 @@
-FROM node:latest AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
 COPY package*.json ./
-
-RUN npm install
+RUN npm ci
 
 COPY . .
-
 RUN npm run build
 
-FROM nginx:latest
+FROM nginx:1.29-alpine
 
-RUN rm -rf /usr/share/nginx/html/*
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/share/nginx/html/*
+    
 COPY --from=builder /app/dist /usr/share/nginx/html/
 
 EXPOSE 80
-
 CMD ["nginx", "-g", "daemon off;"]
-
