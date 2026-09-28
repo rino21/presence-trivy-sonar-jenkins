@@ -1,0 +1,109 @@
+stages:
+  - build
+  - deploy
+
+##########################################"Anchors"##########################################################
+
+#STAGGING
+.front_rules_staging: &front_rules_staging
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - presence-front/**/*
+        - .gitlab-ci.yml
+
+.api_rules_staging: &api_rules_staging
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - presence-api/**/*
+        - .gitlab-ci.yml
+
+.deploy_rules_staging: &deploy_rules_staging
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+##########################################"Build"##########################################################
+
+.build_image: &build_image
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  variables:
+    REGISTRY: ""
+    REGISTRY_USER: ""
+    REGISTRY_PASSWORD: ""
+    IMAGE_NAME: ""
+    IMAGE_TAG: ""
+    CONTEXT: ""
+    DOCKERFILE: ""
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"${REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${REGISTRY_USER}" "${REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - export IFS=''
+    - >-
+      /kaniko/executor
+      --context "${CONTEXT}"
+      --dockerfile "${DOCKERFILE}"
+      --destination "${IMAGE_NAME}:${IMAGE_TAG}"
+
+##########################################"Staging"##########################################################
+
+build_front_staging:
+  <<: [*build_image, *front_rules_staging]
+  variables:
+    REGISTRY: $CI_REGISTRY
+    REGISTRY_USER: $CI_REGISTRY_USER
+    REGISTRY_PASSWORD: $CI_JOB_TOKEN
+    IMAGE_NAME: ${CI_REGISTRY_IMAGE}/staging/front
+    IMAGE_TAG: dev
+    CONTEXT: $CI_PROJECT_DIR/presence-front/
+    DOCKERFILE: $CI_PROJECT_DIR/presence-front/Dockerfile
+
+build_api_staging:
+  <<: [*build_image, *api_rules_staging]
+  variables:
+    REGISTRY: $CI_REGISTRY
+    REGISTRY_USER: $CI_REGISTRY_USER
+    REGISTRY_PASSWORD: $CI_JOB_TOKEN
+    IMAGE_NAME: ${CI_REGISTRY_IMAGE}/staging/api
+    IMAGE_TAG: dev
+    CONTEXT: $CI_PROJECT_DIR/presence-api/
+    DOCKERFILE: $CI_PROJECT_DIR/presence-api/Dockerfile
+
+
+##########################################"Deployement"###########################################################
+
+.deploy_all: &deploy_all
+  stage: deploy
+  image: alpine:latest
+  services:
+    - docker:18.09-dind
+  before_script:
+    - apk update
+    - apk add --update openssh-client bash
+    - eval $(ssh-agent -s)
+    - bash -c 'ssh-add <(echo "$SSH_PRIVATE_KEY")'
+    - mkdir -p ~/.ssh
+    - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+
+
+#staging
+deploy_staging:
+  <<: [*deploy_all, *deploy_rules_staging]
+  stage: deploy
+  environment: staging
+  variables:
+    USER: ${DEPLOYEMENT_USER}
+    HOST: ${DEPLOYEMENT_IP}
+    PATH_COMPOSE: /home/ubuntu/presence
+  script:
+  - scp k8s/* ${USER}@${HOST}:${PATH_COMPOSE}/
+  - ssh ${USER}@${HOST} "
+      cd ${PATH_COMPOSE} &&
+      kubectl apply -f namespace.yml &&
+      kubectl apply -f postgres-pv.yml &&
+      kubectl apply -f postgres-pvc.yml &&
+      kubectl apply -f .
+    "

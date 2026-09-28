@@ -1,0 +1,113 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+
+  ##############################
+  # Build Front
+  ##############################
+
+  build_front:
+    # if: |
+    #   contains(join(github.event.commits.*.modified, ' '), 'presence-front/') ||
+    #   contains(join(github.event.commits.*.added, ' '), 'presence-front/') ||
+    #   contains(join(github.event.commits.*.modified, ' '), '.github/workflows/deploy.yml')
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.TOKEN_GITHUB }}
+
+      - name: Build and Push Front
+        uses: docker/build-push-action@v6
+        with:
+          context: ./presence-front
+          file: ./presence-front/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/staging/front:dev
+
+  ##############################
+  # Build API
+  ##############################
+
+  build_api:
+
+    # if: |
+    #   contains(join(github.event.commits.*.modified, ' '), 'presence-api/') ||
+    #   contains(join(github.event.commits.*.added, ' '), 'presence-api/') ||
+    #   contains(join(github.event.commits.*.modified, ' '), '.github/workflows/deploy.yml')
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.TOKEN_GITHUB }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./presence-api
+          file: ./presence-api/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/staging/api:dev
+
+  ##############################
+  # Deploy
+  ##############################
+
+  deploy:
+
+    needs:
+      - build_front
+      - build_api
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.DEPLOYEMENT_IP }} >> ~/.ssh/known_hosts
+
+      - name: Copy manifests
+        run: |
+          scp -r docker-compose-github.yml \
+          ${{ secrets.DEPLOYEMENT_USER }}@${{ secrets.DEPLOYEMENT_IP }}:/home/rino/presence/docker-compose.yml
+
+      - name: Deploy docker compose
+        run: |
+          ssh ${{ secrets.DEPLOYEMENT_USER }}@${{ secrets.DEPLOYEMENT_IP }} << EOF
+            cd /home/rino/presence
+            docker compose pull && docker compose up -d
+          EOF

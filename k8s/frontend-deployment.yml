@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: presence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+
+  template:
+    metadata:
+      labels:
+        app: frontend
+
+    spec:
+      imagePullSecrets:
+        - name: gitlab-registry-secret
+      containers:
+        - name: frontend
+          image: registry.gitlab.com/victorino.hairun/presence/staging/front:dev
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80

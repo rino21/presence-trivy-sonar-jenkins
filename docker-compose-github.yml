@@ -1,0 +1,110 @@
+version: "3.8"
+
+services:
+  # ─── 🐘 DATABASE ─────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres_container
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - presence
+
+  # ─── 🚀 BACKEND EXPRESS + PRISMA ─────────────
+  backend:
+    image: ghcr.io/rino21/presence/staging/api:dev
+    labels:
+      - "traefik.enable=true"
+
+      # HTTPS
+      - "traefik.http.routers.back.rule=Host(`back.gpc.vic-tec.online`)"
+      - "traefik.http.routers.back.entrypoints=websecure"
+      - "traefik.http.routers.back.tls=true"
+      - "traefik.http.routers.back.tls.certresolver=letsencrypt"
+
+      # HTTP
+      - "traefik.http.routers.back-http.rule=Host(`back.gpc.vic-tec.online`)"
+      - "traefik.http.routers.back-http.entrypoints=web"
+      - "traefik.http.routers.back-http.middlewares=redirect-to-https@file"
+
+      # Service
+      - "traefik.http.services.back.loadbalancer.server.port=3000"
+    container_name: backend_container
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    networks:
+      - presence
+
+  studio: 
+    image: ghcr.io/rino21/presence/staging/api:dev
+    command: sh -c "npx prisma studio --hostname 0.0.0.0 --port 5555"
+    labels:
+      - "traefik.enable=true"
+
+      # HTTPS
+      - "traefik.http.routers.studio.rule=Host(`studio.gpc.vic-tec.online`)"
+      - "traefik.http.routers.studio.entrypoints=websecure"
+      - "traefik.http.routers.studio.tls=true"
+      - "traefik.http.routers.studio.tls.certresolver=letsencrypt"
+
+      # HTTP
+      - "traefik.http.routers.studio-http.rule=Host(`studio.gpc.vic-tec.online`)"
+      - "traefik.http.routers.studio-http.entrypoints=web"
+      - "traefik.http.routers.studio-http.middlewares=redirect-to-https@file"
+
+      # Service
+      - "traefik.http.services.studio.loadbalancer.server.port=5555"
+    container_name: backend_studio
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    networks:
+      - presence
+  # ─── 🌐 FRONTEND REACT + NGINX ─────────────
+  frontend:
+    image: ghcr.io/rino21/presence/staging/front:dev
+    labels:
+      - "traefik.enable=true"
+
+      # HTTPS
+      - "traefik.http.routers.front.rule=Host(`front.gpc.vic-tec.online`)"
+      - "traefik.http.routers.front.entrypoints=websecure"
+      - "traefik.http.routers.front.tls=true"
+      - "traefik.http.routers.front.tls.certresolver=letsencrypt"
+
+      # HTTP
+      - "traefik.http.routers.front-http.rule=Host(`front.gpc.vic-tec.online`)"
+      - "traefik.http.routers.front-http.entrypoints=web"
+      - "traefik.http.routers.front-http.middlewares=redirect-to-https@file"
+
+      # Service
+      - "traefik.http.services.front.loadbalancer.server.port=80"
+    container_name: frontend_container
+    depends_on:
+      - backend
+    networks:
+      - presence
+
+volumes:
+  pgdata:
+
+networks:
+  presence:
+    external: true
+    name: traefik_presence

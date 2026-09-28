@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  # ─── 🐘 DATABASE ─────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres_container
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── 🚀 BACKEND EXPRESS + PRISMA ─────────────
+  backend:
+    build:
+      context: ./presence-api 
+      dockerfile: Dockerfile
+    container_name: backend_container
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+
+
+  # ─── 🌐 FRONTEND REACT + NGINX ─────────────
+  frontend:
+    build:
+      context: ./presence-front
+      dockerfile: Dockerfile
+    container_name: frontend_container
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
