@@ -5,7 +5,7 @@ pipeline {
 
         REGISTRY = "ghcr.io" // ghcr.io/OWNER/IMAGE_NAME:TAG
 
-        REGISTRY_IMAGE = "ghcr.io/rino21/presence"
+        REGISTRY_IMAGE = "ghcr.io/rino21/presence-trivy-sonar-jenkins"
 
         REGISTRY_USER = credentials('registry-user')
 
