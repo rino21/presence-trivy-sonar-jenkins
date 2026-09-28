@@ -80,7 +80,7 @@ pipeline {
             when {
                 anyOf{
                     changeset "presence-front/**"
-                    changeset "Jenkinsfile-sonar-trivy"
+                    changeset "Jenkinsfile"
                 }
             }
 
@@ -113,7 +113,7 @@ pipeline {
             when {
                 anyOf {
                     changeset "presence-front/**"
-                    changeset "Jenkinsfile-sonar-trivy"
+                    changeset "Jenkinsfile"
                 }
             }
             steps {
@@ -137,7 +137,7 @@ pipeline {
             when {
                 anyOf {
                     changeset "presence-api/**"
-                    changeset "Jenkinsfile-sonar-trivy"
+                    changeset "Jenkinsfile"
                 }
             }
 
@@ -170,7 +170,7 @@ pipeline {
             when {
                 anyOf {
                     changeset "presence-api/**"
-                    changeset "Jenkinsfile-sonar-trivy"
+                    changeset "Jenkinsfile"
                 }
             }
             steps {
