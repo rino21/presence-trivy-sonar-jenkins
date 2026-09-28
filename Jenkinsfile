@@ -11,6 +11,7 @@ pipeline {
 
         REGISTRY_PASSWORD = credentials('registry-password')
         
+        
         DEPLOYEMENT_USER = "rino"
         
         DEPLOYEMENT_IP = "192.168.40.137"
