@@ -58,7 +58,7 @@ services:
       - presence
   # ─── 🌐 FRONTEND REACT + NGINX ─────────────
   frontend:
-    image: ghcr.io/rino21/presence/staging/front:dev
+    image: ghcr.io/rino21/presence-trivy-sonar-jenkins/staging/front:dev
     # labels:
     #     - traefik.enable=true
     #     - traefik.http.routers.presence-front.rule=Host(`front-presence-dev.local`)
